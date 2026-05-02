@@ -8,9 +8,12 @@ const SupportChat = () => {
   const [thread, setThread] = useState([])
   const [callActive, setCallActive] = useState(false)
   const [listening, setListening] = useState(false)
+  const [callStatus, setCallStatus] = useState('')
   const [typing, setTyping] = useState(false)
   const recognitionRef = useRef(null)
   const callActiveRef = useRef(false)
+  const agentSpeakingRef = useRef(false)
+  const silenceTimerRef = useRef(null)
   const sessionId = useMemo(() => {
     let id = localStorage.getItem('intellirent_support_session')
     if (!id) {
@@ -32,8 +35,22 @@ const SupportChat = () => {
       setTyping(false)
       setThread((items) => [...items, payload])
       if (payload.from === 'support-ai' && callActiveRef.current && 'speechSynthesis' in window) {
+        agentSpeakingRef.current = true
+        setListening(false)
         window.speechSynthesis.cancel()
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance(payload.message))
+        recognitionRef.current?.stop()
+        const utterance = new SpeechSynthesisUtterance(payload.message)
+        utterance.onend = () => {
+          agentSpeakingRef.current = false
+          if (callActiveRef.current) startListening()
+        }
+        utterance.onerror = () => {
+          agentSpeakingRef.current = false
+          if (callActiveRef.current) startListening()
+        }
+        window.speechSynthesis.speak(utterance)
+      } else if (payload.from === 'support-ai' && callActiveRef.current) {
+        startListening()
       }
     }
     const handleCall = (payload) => {
@@ -63,25 +80,49 @@ const SupportChat = () => {
     setMessage('')
   }
 
+  const resetSilenceTimer = () => {
+    clearTimeout(silenceTimerRef.current)
+    silenceTimerRef.current = setTimeout(() => {
+      if (callActiveRef.current) {
+        setThread((items) => [...items, { from: 'support-ai', message: 'I did not hear anything for one minute, so I am ending the support call. You can start a new call anytime.' }])
+        endCall()
+      }
+    }, 60000)
+  }
+
   const startCall = () => {
     if (!socket) return
     setCallActive(true)
     callActiveRef.current = true
+    setCallStatus('Waiting for your voice...')
     socket.emit('support:call', { sessionId, userName: user?.name || 'Guest' })
+    resetSilenceTimer()
+    setTimeout(() => {
+      if (callActiveRef.current) startListening()
+    }, 700)
   }
 
-  const listenOnce = () => {
-    if (!socket || listening) return
+  const startListening = () => {
+    if (!socket || !callActiveRef.current || agentSpeakingRef.current) return
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SpeechRecognition) return
+    if (!SpeechRecognition) {
+      setCallStatus('Voice recognition is not supported in this browser. Type your message below.')
+      return
+    }
     if ('speechSynthesis' in window) window.speechSynthesis.cancel()
     const recognition = new SpeechRecognition()
     recognition.lang = 'en-IN'
     recognition.continuous = false
     recognition.interimResults = false
+    recognition.onstart = () => {
+      setListening(true)
+      setCallStatus('Listening...')
+    }
     recognition.onresult = (event) => {
       const transcript = event.results?.[0]?.[0]?.transcript
       if (transcript) {
+        resetSilenceTimer()
+        setCallStatus('Agent is preparing a response...')
         socket.emit('support:message', {
           sessionId,
           userName: user?.name || 'Guest',
@@ -89,21 +130,45 @@ const SupportChat = () => {
         })
       }
     }
-    recognition.onerror = () => setListening(false)
-    recognition.onend = () => setListening(false)
+    recognition.onerror = () => {
+      setListening(false)
+      if (callActiveRef.current && !agentSpeakingRef.current) {
+        setCallStatus('Waiting for your voice...')
+        setTimeout(startListening, 700)
+      }
+    }
+    recognition.onend = () => {
+      setListening(false)
+      if (callActiveRef.current && !agentSpeakingRef.current && !typing) {
+        setCallStatus('Waiting for your voice...')
+        setTimeout(startListening, 700)
+      }
+    }
     recognitionRef.current = recognition
-    setListening(true)
-    recognition.start()
+    try {
+      recognition.start()
+    } catch {
+      setListening(false)
+    }
   }
 
   const endCall = () => {
     setCallActive(false)
     setListening(false)
+    setCallStatus('')
     callActiveRef.current = false
+    agentSpeakingRef.current = false
+    clearTimeout(silenceTimerRef.current)
     recognitionRef.current?.stop()
     recognitionRef.current = null
     if ('speechSynthesis' in window) window.speechSynthesis.cancel()
   }
+
+  useEffect(() => () => {
+    clearTimeout(silenceTimerRef.current)
+    recognitionRef.current?.stop()
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+  }, [])
 
   return (
     <div className="fixed bottom-5 left-5 z-50">
@@ -122,10 +187,8 @@ const SupportChat = () => {
             {thread.length === 0 && <p className="rounded-2xl bg-light px-4 py-2 text-sm text-gray-600">Support is ready for booking, payment, refund, license, or pickup questions.</p>}
             {callActive && (
               <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-700">
-                <p>AI support call is live. Press Listen, speak once, then wait for the agent response.</p>
-                <button type="button" onClick={listenOnce} disabled={listening} className="mt-2 rounded-full bg-green-700 px-4 py-2 font-medium text-white disabled:opacity-60">
-                  {listening ? 'Listening...' : 'Listen'}
-                </button>
+                <p>AI support call is live. Speak when you need help; the call ends automatically after 1 minute of silence.</p>
+                <p className="mt-2 font-semibold">{callStatus || (listening ? 'Listening...' : 'Waiting for your voice...')}</p>
               </div>
             )}
             {thread.map((item, index) => (
