@@ -1,0 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+*{
+  font-family: "Inter", sans-serif;
+}
+
+h1, h2, .font-display{
+  font-family: "Playfair Display", serif;
+}
+
+@theme {
+  --color-primary: #ad4f27;
+  --color-primary-dull: #8f3f1e;
+  --color-light: #f4eee5;
+  --color-borderColor: #ded4c8;
+}
+
+body{
+  margin: 0;
+  color: #111827;
+  background:
+    radial-gradient(circle at top left, rgba(173,79,39,0.22), transparent 32rem),
+    linear-gradient(120deg, #efe1cf, #faf7f1 44%, #eadfd5);
+}
+
+button, a, input, select, textarea{
+  font: inherit;
+}
+
+.hero-shell{
+  background:
+    radial-gradient(circle at 18% 18%, rgba(173,79,39,0.18), transparent 26rem),
+    linear-gradient(135deg, rgba(246,241,233,0.96), rgba(255,251,246,0.86));
+}

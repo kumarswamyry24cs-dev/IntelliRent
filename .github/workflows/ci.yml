@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install server
+        working-directory: server
+        run: npm ci
+      - name: Server syntax and tests
+        working-directory: server
+        run: |
+          node --check server.js
+          npm test
+      - name: Install client
+        working-directory: client
+        run: npm ci
+      - name: Client build
+        working-directory: client
+        run: npm run build
