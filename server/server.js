@@ -14,6 +14,7 @@ import ownerRouter from "./routes/ownerRoutes.js";
 import bookingRouter from "./routes/bookingRoutes.js";
 import analyticsRouter from "./routes/analyticsRoutes.js";
 import healthRouter from "./routes/healthRoutes.js";
+import supportRouter from "./routes/supportRoutes.js";
 import { setSocketServer } from "./services/socketService.js";
 
 // Initialize Express App
@@ -50,6 +51,7 @@ app.use('/api/user', userRouter)
 app.use('/api/owner', ownerRouter)
 app.use('/api/bookings', bookingRouter)
 app.use('/api/analytics', analyticsRouter)
+app.use('/api/support', supportRouter)
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, ()=> console.log(`Server running on port ${PORT}`))

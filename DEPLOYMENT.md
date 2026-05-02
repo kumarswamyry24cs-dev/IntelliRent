@@ -29,6 +29,7 @@ GITHUB_MODELS_BASE_URL=https://models.github.ai/inference
 # Preferred chatbot provider for fast dynamic answers
 GROQ_API_KEY=gsk_...
 GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_TRANSCRIPTION_MODEL=whisper-large-v3-turbo
 
 # Booking confirmation email
 SMTP_HOST=smtp.gmail.com
@@ -81,7 +82,8 @@ VITE_GOOGLE_MAPS_API_KEY=your_browser_key
 - Cars seeded by `npm run seed:fleet` include city coordinates. The car details page uses coordinates first, then falls back to a city pickup search.
 - Live support uses Socket.IO events from the existing backend.
 - The support agent uses the same AI provider chain as the chatbot: Groq first, then GitHub Models, then OpenAI, then local support fallback.
-- The support call agent uses browser speech recognition and text-to-speech when available. Chrome-based browsers provide the best support.
+- The support call agent records short microphone chunks in the browser and transcribes them on the backend with Groq Whisper. This is deployment-safe as long as the frontend is served over HTTPS and `GROQ_API_KEY` is configured on the backend.
+- Microphone access requires HTTPS in production. Localhost works during development.
 - For real email delivery, `SMTP_HOST`, `SMTP_USER`, and `SMTP_PASS` must be configured on the backend. Without SMTP, the backend only generates a preview email and reports `confirmationEmailStatus=preview`.
 
 ## Verification

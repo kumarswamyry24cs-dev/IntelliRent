@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppContext } from '../context/AppContext'
 
 const SupportChat = () => {
-  const { socket, user } = useAppContext()
+  const { socket, user, axios } = useAppContext()
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [thread, setThread] = useState([])
@@ -10,7 +10,8 @@ const SupportChat = () => {
   const [listening, setListening] = useState(false)
   const [callStatus, setCallStatus] = useState('')
   const [typing, setTyping] = useState(false)
-  const recognitionRef = useRef(null)
+  const recorderRef = useRef(null)
+  const mediaStreamRef = useRef(null)
   const callActiveRef = useRef(false)
   const agentSpeakingRef = useRef(false)
   const awaitingReplyRef = useRef(false)
@@ -45,7 +46,7 @@ const SupportChat = () => {
         agentSpeakingRef.current = true
         setListening(false)
         window.speechSynthesis.cancel()
-        recognitionRef.current?.stop()
+        stopRecorder()
         const utterance = new SpeechSynthesisUtterance(payload.message)
         utterance.onend = () => {
           agentSpeakingRef.current = false
@@ -79,12 +80,25 @@ const SupportChat = () => {
   const send = (event) => {
     event.preventDefault()
     if (!message.trim() || !socket) return
+    if (callActiveRef.current) resetSilenceTimer()
     socket.emit('support:message', {
       sessionId,
       userName: user?.name || 'Guest',
       message: message.trim(),
     })
     setMessage('')
+  }
+
+  const sendSupportMessage = (text) => {
+    if (!text.trim() || !socket) return
+    awaitingReplyRef.current = true
+    resetSilenceTimer()
+    setCallStatus('Agent is preparing a response...')
+    socket.emit('support:message', {
+      sessionId,
+      userName: user?.name || 'Guest',
+      message: text.trim(),
+    })
   }
 
   const resetSilenceTimer = () => {
@@ -120,57 +134,84 @@ const SupportChat = () => {
 
   const startListening = () => {
     if (!socket || !callActiveRef.current || agentSpeakingRef.current || awaitingReplyRef.current || listeningRef.current) return
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SpeechRecognition) {
-      setCallStatus('Voice recognition is not supported in this browser. Type your message below.')
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      setCallStatus('Microphone recording is not supported in this browser. Type your message below.')
       return
     }
     if ('speechSynthesis' in window) window.speechSynthesis.cancel()
-    recognitionRef.current?.stop()
-    const recognition = new SpeechRecognition()
-    recognition.lang = 'en-IN'
-    recognition.continuous = false
-    recognition.interimResults = false
-    recognition.onstart = () => {
+    stopRecorder()
+
+    const startRecording = async () => {
+      const stream = mediaStreamRef.current || await navigator.mediaDevices.getUserMedia({audio: true})
+      mediaStreamRef.current = stream
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'
+      const recorder = new MediaRecorder(stream, {mimeType})
+      const chunks = []
+      recorder.ondataavailable = (event) => {
+        if (event.data?.size) chunks.push(event.data)
+      }
+      recorder.onstart = () => {
+        listeningRef.current = true
+        setListening(true)
+        setCallStatus('Listening...')
+      }
+      recorder.onerror = () => {
+        listeningRef.current = false
+        setListening(false)
+        setCallStatus('Microphone error. Check permission and keep this tab open.')
+        scheduleListening(1200)
+      }
+      recorder.onstop = async () => {
+        listeningRef.current = false
+        setListening(false)
+        if (!callActiveRef.current || agentSpeakingRef.current || awaitingReplyRef.current) return
+        if (!chunks.length) {
+          setCallStatus('Waiting for your voice...')
+          scheduleListening(700)
+          return
+        }
+        try {
+          setCallStatus('Understanding your voice...')
+          const blob = new Blob(chunks, {type: mimeType})
+          const formData = new FormData()
+          formData.append('audio', blob, 'support-call.webm')
+          const { data } = await axios.post('/api/support/transcribe', formData, {
+            headers: {'Content-Type': 'multipart/form-data'}
+          })
+          const transcript = data.success ? data.text?.trim() : ''
+          if (transcript) {
+            sendSupportMessage(transcript)
+          } else {
+            setCallStatus('Waiting for your voice...')
+            scheduleListening(700)
+          }
+        } catch (error) {
+          setCallStatus(error.response?.data?.message || 'Could not understand audio. Speak again or type below.')
+          scheduleListening(1600)
+        }
+      }
+      recorderRef.current = recorder
+      recorder.start()
+      setTimeout(() => {
+        if (recorderRef.current === recorder && recorder.state === 'recording') {
+          recorder.stop()
+        }
+      }, 4500)
+    }
+
+    startRecording().catch(() => {
       listeningRef.current = true
-      setListening(true)
-      setCallStatus('Listening...')
-    }
-    recognition.onresult = (event) => {
-      const transcript = event.results?.[0]?.[0]?.transcript
-      if (transcript) {
-        awaitingReplyRef.current = true
-        resetSilenceTimer()
-        setCallStatus('Agent is preparing a response...')
-        socket.emit('support:message', {
-          sessionId,
-          userName: user?.name || 'Guest',
-          message: transcript,
-        })
-      }
-    }
-    recognition.onerror = () => {
       listeningRef.current = false
       setListening(false)
-      if (callActiveRef.current && !agentSpeakingRef.current && !awaitingReplyRef.current) {
-        setCallStatus('Waiting for your voice...')
-        scheduleListening(900)
-      }
+      setCallStatus('Microphone permission is required. Allow microphone access or type your message below.')
+    })
+  }
+
+  const stopRecorder = () => {
+    if (recorderRef.current?.state === 'recording') {
+      recorderRef.current.stop()
     }
-    recognition.onend = () => {
-      listeningRef.current = false
-      setListening(false)
-      if (callActiveRef.current && !agentSpeakingRef.current && !awaitingReplyRef.current) {
-        setCallStatus('Waiting for your voice...')
-        scheduleListening(900)
-      }
-    }
-    recognitionRef.current = recognition
-    try {
-      recognition.start()
-    } catch {
-      setListening(false)
-    }
+    recorderRef.current = null
   }
 
   const endCall = () => {
@@ -183,15 +224,17 @@ const SupportChat = () => {
     listeningRef.current = false
     clearTimeout(silenceTimerRef.current)
     clearTimeout(restartTimerRef.current)
-    recognitionRef.current?.stop()
-    recognitionRef.current = null
+    stopRecorder()
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
+    mediaStreamRef.current = null
     if ('speechSynthesis' in window) window.speechSynthesis.cancel()
   }
 
   useEffect(() => () => {
     clearTimeout(silenceTimerRef.current)
     clearTimeout(restartTimerRef.current)
-    recognitionRef.current?.stop()
+    stopRecorder()
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
     if ('speechSynthesis' in window) window.speechSynthesis.cancel()
   }, [])
 
@@ -212,7 +255,7 @@ const SupportChat = () => {
             {thread.length === 0 && <p className="rounded-2xl bg-light px-4 py-2 text-sm text-gray-600">Support is ready for booking, payment, refund, license, or pickup questions.</p>}
             {callActive && (
               <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-700">
-                <p>AI support call is live. Speak when you need help; the call ends automatically after 1 minute of silence.</p>
+                <p>AI support call is live. Speak normally; the app records short secure audio chunks, understands them, and waits for the agent reply.</p>
                 <p className="mt-2 font-semibold">{callStatus || (listening ? 'Listening...' : 'Waiting for your voice...')}</p>
               </div>
             )}
