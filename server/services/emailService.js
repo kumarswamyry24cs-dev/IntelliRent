@@ -2,6 +2,8 @@ import nodemailer from "nodemailer";
 
 const hasSmtpConfig = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 
+export const isEmailDeliveryConfigured = () => hasSmtpConfig;
+
 const getTransporter = () => {
     if(hasSmtpConfig){
         return nodemailer.createTransport({
@@ -29,7 +31,7 @@ const formatDate = (date) => new Intl.DateTimeFormat("en-IN", {
 export const sendBookingConfirmationEmail = async ({booking}) => {
     const user = booking.user;
     const car = booking.car;
-    if(!user?.email || !car) return {sent: false, skipped: true};
+    if(!user?.email || !car) return {sent: false, skipped: true, reason: "Missing user email or car details"};
 
     const transporter = getTransporter();
     const currency = process.env.CURRENCY_CODE || "INR";
@@ -85,5 +87,5 @@ export const sendBookingConfirmationEmail = async ({booking}) => {
         console.log("Booking confirmation email generated. Configure SMTP_HOST, SMTP_USER, and SMTP_PASS to send real email.", info.message);
     }
 
-    return {sent: hasSmtpConfig, preview: !hasSmtpConfig};
+    return {sent: hasSmtpConfig, preview: !hasSmtpConfig, messageId: info.messageId};
 };

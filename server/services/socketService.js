@@ -1,3 +1,8 @@
+import Car from "../models/Car.js";
+import { answerWithFleetContext } from "./aiService.js";
+import { withDynamicCarImage } from "./carImageService.js";
+import { demoCars, isDbConnected } from "../utils/demoData.js";
+
 let ioInstance = null;
 
 const supportThreads = new Map();
@@ -22,7 +27,7 @@ export const setSocketServer = (io) => {
             });
         });
 
-        socket.on("support:message", ({sessionId = socket.id, message = "", userName = "Guest"} = {}) => {
+        socket.on("support:message", async ({sessionId = socket.id, message = "", userName = "Guest"} = {}) => {
             const cleanMessage = message.toString().trim();
             if(!cleanMessage) return;
             const thread = getSupportThread(sessionId);
@@ -36,15 +41,18 @@ export const setSocketServer = (io) => {
             thread.push(customerMessage);
             io.to(`support:${sessionId}`).emit("support:message", customerMessage);
 
+            const typingId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            io.to(`support:${sessionId}`).emit("support:typing", {id: typingId, from: "support-ai"});
+            const reply = await buildSupportReply(cleanMessage, thread);
             const assistantMessage = {
                 id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
                 from: "support-ai",
                 userName: "IntelliRent Support",
-                message: buildSupportReply(cleanMessage),
+                message: reply,
                 createdAt: new Date().toISOString()
             };
             thread.push(assistantMessage);
-            setTimeout(() => io.to(`support:${sessionId}`).emit("support:message", assistantMessage), 350);
+            io.to(`support:${sessionId}`).emit("support:message", assistantMessage);
         });
 
         socket.on("support:call", ({sessionId = socket.id, userName = "Guest"} = {}) => {
@@ -64,8 +72,43 @@ export const emitAvailabilityUpdate = (payload) => {
     }
 };
 
-const buildSupportReply = (message) => {
+const buildSupportReply = async (message, thread = []) => {
+    try {
+        const cars = (isDbConnected() ? await Car.find({isAvaliable: true}).limit(80) : demoCars).map(withDynamicCarImage);
+        const recent = thread.slice(-8).map((item) => `${item.from}: ${item.message}`).join("\n");
+        const result = await answerWithFleetContext({
+            message: [
+                "You are IntelliRent live customer support, not a generic chatbot.",
+                "Respond naturally, avoid repeating the same greeting, and directly solve the user's current support issue.",
+                "Use short actionable steps for booking, payment, refund, license, pickup map, and account problems.",
+                `Recent support transcript:\n${recent}`,
+                `Current customer message: ${message}`
+            ].join("\n\n"),
+            cars,
+            policies: [
+                "Ask for booking ID only when it is needed.",
+                "Payments are confirmed only after Razorpay signature verification.",
+                "Confirmation email is sent after successful payment confirmation when SMTP is configured.",
+                "Driver license upload is required before checkout.",
+                "Cancelled paid bookings are marked refunded in My Bookings."
+            ]
+        });
+        if(result.provider === "local-rag"){
+            return buildSupportFallback(message);
+        }
+        return result.reply;
+    } catch (error) {
+        console.error("Support AI failed:", error.message);
+    }
+
+    return buildSupportFallback(message);
+};
+
+const buildSupportFallback = (message) => {
     const lower = message.toLowerCase();
+    if(/email|mail|confirmation|receipt|invoice/.test(lower)){
+        return "For confirmation email issues, first confirm the payment is marked paid in My Bookings. The server sends email only after Razorpay signature verification or payment.captured webhook success. Also check that SMTP_HOST, SMTP_USER, SMTP_PASS, and MAIL_FROM are configured on the backend; without SMTP the app records the email as preview instead of sending it.";
+    }
     if(/payment|razorpay|paid|pay/.test(lower)){
         return "I can help with payment issues. Please confirm the booking ID, payment status, and whether Razorpay opened successfully. If payment was captured, IntelliRent verifies the signature before confirming the booking.";
     }

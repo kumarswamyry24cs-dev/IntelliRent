@@ -24,17 +24,14 @@ const Cars = () => {
   const [filteredCars, setFilteredCars] = useState([])
 
   const applyFilter = async ()=>{
-     
-    if(input === ''){
-      setFilteredCars(cars)
-      return null
-    }
-
+    const searchText = input.trim().toLowerCase()
     const filtered = cars.slice().filter((car)=>{
-      const textMatch = car.brand.toLowerCase().includes(input.toLowerCase())
-      || car.model.toLowerCase().includes(input.toLowerCase())  
-      || car.category.toLowerCase().includes(input.toLowerCase())  
-      || car.transmission.toLowerCase().includes(input.toLowerCase())
+      const textMatch = !searchText
+      || car.brand.toLowerCase().includes(searchText)
+      || car.model.toLowerCase().includes(searchText)
+      || car.category.toLowerCase().includes(searchText)
+      || car.transmission.toLowerCase().includes(searchText)
+      || car.location.toLowerCase().includes(searchText)
       const priceMatch = !filters.maxPrice || car.pricePerDay <= Number(filters.maxPrice)
       const fuelMatch = !filters.fuel_type || car.fuel_type === filters.fuel_type
       return textMatch && priceMatch && fuelMatch

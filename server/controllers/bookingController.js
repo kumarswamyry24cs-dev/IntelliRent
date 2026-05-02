@@ -203,13 +203,26 @@ export const confirmBookingPayment = async (req, res)=>{
             currency: process.env.CURRENCY_CODE || "INR"
         });
         const populatedBooking = await Booking.findById(booking._id).populate("car user");
+        let emailResult = {sent: false, preview: false};
         try {
-            await sendBookingConfirmationEmail({booking: populatedBooking});
+            emailResult = await sendBookingConfirmationEmail({booking: populatedBooking});
+            booking.confirmationEmailStatus = emailResult.sent ? "sent" : emailResult.preview ? "preview" : "failed";
+            booking.confirmationEmailError = emailResult.reason || "";
+            if(emailResult.sent) booking.confirmationEmailSentAt = new Date();
+            await booking.save();
         } catch (emailError) {
             console.error("Booking confirmation email failed:", emailError.message);
+            booking.confirmationEmailStatus = "failed";
+            booking.confirmationEmailError = emailError.message;
+            await booking.save();
         }
         await writeAuditLog(req, "payment.confirmed", "Booking", booking._id.toString(), {paymentId});
-        res.json({success: true, message: "Payment confirmed and booking email queued", booking})
+        const emailMessage = booking.confirmationEmailStatus === "sent"
+            ? "Confirmation email sent."
+            : booking.confirmationEmailStatus === "preview"
+                ? "Payment confirmed. Email SMTP is not configured, so the email was generated in preview mode."
+                : "Payment confirmed, but confirmation email failed.";
+        res.json({success: true, message: `Payment confirmed. ${emailMessage}`, booking, email: {...emailResult, status: booking.confirmationEmailStatus}})
     } catch (error) {
         console.log(error.message);
         res.json({success: false, message: error.message})
@@ -270,9 +283,16 @@ export const razorpayWebhook = async (req, res)=>{
             ).populate("car user");
             if(booking){
                 try {
-                    await sendBookingConfirmationEmail({booking});
+                    const emailResult = await sendBookingConfirmationEmail({booking});
+                    booking.confirmationEmailStatus = emailResult.sent ? "sent" : emailResult.preview ? "preview" : "failed";
+                    booking.confirmationEmailError = emailResult.reason || "";
+                    if(emailResult.sent) booking.confirmationEmailSentAt = new Date();
+                    await booking.save();
                 } catch (emailError) {
                     console.error("Webhook booking confirmation email failed:", emailError.message);
+                    booking.confirmationEmailStatus = "failed";
+                    booking.confirmationEmailError = emailError.message;
+                    await booking.save();
                 }
             }
         }

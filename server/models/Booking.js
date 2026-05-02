@@ -12,6 +12,9 @@ const bookingSchema = new mongoose.Schema({
     paymentProvider: {type: String, default: "razorpay"},
     paymentId: {type: String, default: ""},
     paymentOrderId: {type: String, default: ""},
+    confirmationEmailSentAt: {type: Date},
+    confirmationEmailStatus: {type: String, enum: ["pending", "sent", "preview", "failed"], default: "pending"},
+    confirmationEmailError: {type: String, default: ""},
     cancellationReason: {type: String, default: ""},
     cancelledAt: {type: Date},
     price: {type: Number, required: true}

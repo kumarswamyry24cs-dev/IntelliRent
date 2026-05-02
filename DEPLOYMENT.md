@@ -80,7 +80,9 @@ VITE_GOOGLE_MAPS_API_KEY=your_browser_key
 - Restrict the Google Maps browser key to your frontend domain in production.
 - Cars seeded by `npm run seed:fleet` include city coordinates. The car details page uses coordinates first, then falls back to a city pickup search.
 - Live support uses Socket.IO events from the existing backend.
+- The support agent uses the same AI provider chain as the chatbot: Groq first, then GitHub Models, then OpenAI, then local support fallback.
 - The support call agent uses browser speech recognition and text-to-speech when available. Chrome-based browsers provide the best support.
+- For real email delivery, `SMTP_HOST`, `SMTP_USER`, and `SMTP_PASS` must be configured on the backend. Without SMTP, the backend only generates a preview email and reports `confirmationEmailStatus=preview`.
 
 ## Verification
 

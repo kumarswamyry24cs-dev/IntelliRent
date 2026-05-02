@@ -7,6 +7,7 @@ const SupportChat = () => {
   const [message, setMessage] = useState('')
   const [thread, setThread] = useState([])
   const [callActive, setCallActive] = useState(false)
+  const [typing, setTyping] = useState(false)
   const recognitionRef = useRef(null)
   const callActiveRef = useRef(false)
   const sessionId = useMemo(() => {
@@ -23,11 +24,13 @@ const SupportChat = () => {
     const userName = user?.name || 'Guest'
     socket.emit('support:join', { sessionId, userName })
     const handleStatus = (payload) => {
-      setThread((items) => [...items, { from: 'support-ai', message: payload.message }])
+      setThread((items) => items.length ? items : [{ from: 'support-ai', message: payload.message }])
     }
+    const handleTyping = () => setTyping(true)
     const handleMessage = (payload) => {
+      setTyping(false)
       setThread((items) => [...items, payload])
-      if (payload.from === 'support-ai' && callActive && 'speechSynthesis' in window) {
+      if (payload.from === 'support-ai' && callActiveRef.current && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel()
         window.speechSynthesis.speak(new SpeechSynthesisUtterance(payload.message))
       }
@@ -37,14 +40,16 @@ const SupportChat = () => {
       setThread((items) => [...items, { from: 'support-ai', message: payload.message }])
     }
     socket.on('support:status', handleStatus)
+    socket.on('support:typing', handleTyping)
     socket.on('support:message', handleMessage)
     socket.on('support:call:started', handleCall)
     return () => {
       socket.off('support:status', handleStatus)
+      socket.off('support:typing', handleTyping)
       socket.off('support:message', handleMessage)
       socket.off('support:call:started', handleCall)
     }
-  }, [socket, sessionId, user, callActive])
+  }, [socket, sessionId, user?.name])
 
   const send = (event) => {
     event.preventDefault()
@@ -114,6 +119,7 @@ const SupportChat = () => {
                 {item.message}
               </p>
             ))}
+            {typing && <p className="mr-10 rounded-2xl bg-light px-4 py-2 text-sm text-gray-500">Support is checking this...</p>}
           </div>
           <form onSubmit={send} className="flex gap-2 border-t border-borderColor p-3">
             <input value={message} onChange={(event) => setMessage(event.target.value)} className="min-w-0 flex-1 rounded-full border border-borderColor px-4 py-2 outline-none" placeholder="Message support..." />

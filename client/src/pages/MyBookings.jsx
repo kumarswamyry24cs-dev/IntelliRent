@@ -4,6 +4,7 @@ import Title from '../components/Title'
 import { useAppContext } from '../context/AppContext'
 import toast from 'react-hot-toast'
 import { motion } from 'motion/react'
+import { getDisplayCarImage, getFallbackCarImage } from '../utils/carImages'
 
 const MyBookings = () => {
 
@@ -64,7 +65,7 @@ const MyBookings = () => {
 
             <div className='md:col-span-1'>
               <div className='rounded-md overflow-hidden mb-3'>
-                <img src={booking.car.image} alt="" className='w-full h-auto aspect-video object-cover'/>
+                <img src={getDisplayCarImage(booking.car)} onError={(event) => { event.currentTarget.src = getFallbackCarImage(booking.car) }} alt={`${booking.car.brand} ${booking.car.model}`} className='w-full h-auto aspect-video object-cover'/>
               </div>
               <p className='text-lg font-medium mt-2'>{booking.car.brand} {booking.car.model}</p>
 
