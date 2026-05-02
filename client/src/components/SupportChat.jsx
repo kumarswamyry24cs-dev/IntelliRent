@@ -7,6 +7,7 @@ const SupportChat = () => {
   const [message, setMessage] = useState('')
   const [thread, setThread] = useState([])
   const [callActive, setCallActive] = useState(false)
+  const [listening, setListening] = useState(false)
   const [typing, setTyping] = useState(false)
   const recognitionRef = useRef(null)
   const callActiveRef = useRef(false)
@@ -67,8 +68,13 @@ const SupportChat = () => {
     setCallActive(true)
     callActiveRef.current = true
     socket.emit('support:call', { sessionId, userName: user?.name || 'Guest' })
+  }
+
+  const listenOnce = () => {
+    if (!socket || listening) return
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) return
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
     const recognition = new SpeechRecognition()
     recognition.lang = 'en-IN'
     recognition.continuous = false
@@ -83,15 +89,16 @@ const SupportChat = () => {
         })
       }
     }
-    recognition.onend = () => {
-      if (callActiveRef.current) recognition.start()
-    }
+    recognition.onerror = () => setListening(false)
+    recognition.onend = () => setListening(false)
     recognitionRef.current = recognition
+    setListening(true)
     recognition.start()
   }
 
   const endCall = () => {
     setCallActive(false)
+    setListening(false)
     callActiveRef.current = false
     recognitionRef.current?.stop()
     recognitionRef.current = null
@@ -113,7 +120,14 @@ const SupportChat = () => {
           </div>
           <div className="max-h-80 space-y-3 overflow-auto p-4">
             {thread.length === 0 && <p className="rounded-2xl bg-light px-4 py-2 text-sm text-gray-600">Support is ready for booking, payment, refund, license, or pickup questions.</p>}
-            {callActive && <p className="rounded-2xl bg-green-50 px-4 py-2 text-sm text-green-700">AI support call is live. Speak naturally or type below.</p>}
+            {callActive && (
+              <div className="rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-700">
+                <p>AI support call is live. Press Listen, speak once, then wait for the agent response.</p>
+                <button type="button" onClick={listenOnce} disabled={listening} className="mt-2 rounded-full bg-green-700 px-4 py-2 font-medium text-white disabled:opacity-60">
+                  {listening ? 'Listening...' : 'Listen'}
+                </button>
+              </div>
+            )}
             {thread.map((item, index) => (
               <p key={item.id || index} className={`rounded-2xl px-4 py-2 text-sm ${item.from === 'customer' ? 'ml-10 bg-primary text-white' : 'mr-10 bg-light text-gray-700'}`}>
                 {item.message}

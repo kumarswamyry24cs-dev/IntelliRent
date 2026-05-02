@@ -1,14 +1,11 @@
 import React from 'react'
 
 const CarLocationMap = ({ car }) => {
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
   const hasCoordinates = Number(car.coordinates?.lat) && Number(car.coordinates?.lng)
   const coordinateQuery = hasCoordinates ? `${car.coordinates.lat},${car.coordinates.lng}` : ''
   const labelQuery = `${car.location} IntelliRent ${car.brand} ${car.model} pickup`
   const query = encodeURIComponent(coordinateQuery || labelQuery)
-  const src = apiKey
-    ? `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${query}&zoom=13`
-    : `https://www.google.com/maps?q=${query}&output=embed`
+  const src = `https://www.google.com/maps?q=${query}&z=13&output=embed`
 
   return (
     <section>
