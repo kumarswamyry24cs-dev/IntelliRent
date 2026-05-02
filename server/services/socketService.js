@@ -79,8 +79,9 @@ const buildSupportReply = async (message, thread = []) => {
         const result = await answerWithFleetContext({
             message: [
                 "You are IntelliRent live customer support, not a generic chatbot.",
-                "Respond naturally, avoid repeating the same greeting, and directly solve the user's current support issue.",
-                "Use short actionable steps for booking, payment, refund, license, pickup map, and account problems.",
+                "Respond naturally in 2-5 concise sentences. Do not repeat greetings or ask the same question twice.",
+                "Directly solve the user's current support issue. If information is missing, ask for exactly one next detail.",
+                "Handle booking, availability, Razorpay payment, confirmation email, refunds, license upload, maps, filters, search, account, owner dashboard, and support-call issues.",
                 `Recent support transcript:\n${recent}`,
                 `Current customer message: ${message}`
             ].join("\n\n"),
@@ -90,7 +91,9 @@ const buildSupportReply = async (message, thread = []) => {
                 "Payments are confirmed only after Razorpay signature verification.",
                 "Confirmation email is sent after successful payment confirmation when SMTP is configured.",
                 "Driver license upload is required before checkout.",
-                "Cancelled paid bookings are marked refunded in My Bookings."
+                "Cancelled paid bookings are marked refunded in My Bookings.",
+                "Google Maps uses car coordinates first and then city pickup fallback.",
+                "If the user says the call or microphone is unstable, tell them to keep the browser tab focused, allow microphone permission, and speak after the Listening status appears."
             ]
         });
         if(result.provider === "local-rag"){
@@ -108,6 +111,15 @@ const buildSupportFallback = (message) => {
     const lower = message.toLowerCase();
     if(/email|mail|confirmation|receipt|invoice/.test(lower)){
         return "For confirmation email issues, first confirm the payment is marked paid in My Bookings. The server sends email only after Razorpay signature verification or payment.captured webhook success. Also check that SMTP_HOST, SMTP_USER, SMTP_PASS, and MAIL_FROM are configured on the backend; without SMTP the app records the email as preview instead of sending it.";
+    }
+    if(/microphone|mic|listen|voice|call|agent|repeat|unstable|glitch/.test(lower)){
+        return "For the AI support call, keep this browser tab focused, allow microphone permission, and speak only when the status says Listening. I pause listening while the agent speaks, then resume automatically. If no voice is detected for one minute, the call ends by itself.";
+    }
+    if(/map|google|location|pickup|coordinate|direction/.test(lower)){
+        return "For pickup maps, open the car details page and check the Pickup map section. IntelliRent uses the car's saved coordinates first, then falls back to the city pickup location, and the Open in Google Maps link opens the same pickup point externally.";
+    }
+    if(/sort|filter|search|price|low|high|fuel/.test(lower)){
+        return "For filtering cars, open Cars, choose a max price, fuel type, and sort order. Low to high sorts by daily price ascending, High to low sorts descending, and search works with brand, model, category, transmission, or location.";
     }
     if(/payment|razorpay|paid|pay/.test(lower)){
         return "I can help with payment issues. Please confirm the booking ID, payment status, and whether Razorpay opened successfully. If payment was captured, IntelliRent verifies the signature before confirming the booking.";
