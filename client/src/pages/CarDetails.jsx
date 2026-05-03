@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import { motion } from 'motion/react'
 import { getDisplayCarImage, getFallbackCarImage } from '../utils/carImages'
 import CarLocationMap from '../components/CarLocationMap'
+import { formatCarPrice } from '../utils/currency'
 
 const CarDetails = () => {
 
@@ -18,7 +19,6 @@ const CarDetails = () => {
   const [car, setCar] = useState(null)
   const [reviews, setReviews] = useState([])
   const [reviewForm, setReviewForm] = useState({rating: 5, comment: ''})
-  const currency = import.meta.env.VITE_CURRENCY
 
   const confirmPayment = async (bookingId, razorpayOrder, razorpayKeyId) => {
     const key = razorpayKeyId || import.meta.env.VITE_RAZORPAY_KEY_ID
@@ -189,7 +189,7 @@ const CarDetails = () => {
 
           onSubmit={handleSubmit} className='shadow-lg h-max sticky top-18 rounded-xl p-6 space-y-6 text-gray-500'>
 
-            <p className='flex items-center justify-between text-2xl text-gray-800 font-semibold'>{currency}{car.pricePerDay}<span className='text-base text-gray-400 font-normal'>per day</span></p> 
+            <p className='flex items-center justify-between text-2xl text-gray-800 font-semibold'>{formatCarPrice(car)}<span className='text-base text-gray-400 font-normal'>per day</span></p> 
 
             <hr className='border-borderColor my-6'/>
 

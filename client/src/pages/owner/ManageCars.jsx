@@ -3,10 +3,12 @@ import { assets} from '../../assets/assets'
 import Title from '../../components/owner/Title'
 import { useAppContext } from '../../context/AppContext'
 import toast from 'react-hot-toast'
+import { formatCarPrice } from '../../utils/currency'
+import { getDisplayCarImage, getFallbackCarImage } from '../../utils/carImages'
 
 const ManageCars = () => {
 
-  const {isOwner, axios, currency} = useAppContext()
+  const {isOwner, axios} = useAppContext()
 
   const [cars, setCars] = useState([])
 
@@ -82,7 +84,7 @@ const ManageCars = () => {
               <tr key={index} className='border-t border-borderColor'>
 
                 <td className='p-3 flex items-center gap-3'>
-                  <img src={car.image} alt="" className="h-12 w-12 aspect-square rounded-md object-cover"/>
+                  <img src={getDisplayCarImage(car)} onError={(event) => { event.currentTarget.src = getFallbackCarImage(car) }} alt={`${car.brand} ${car.model}`} className="h-12 w-12 aspect-square rounded-md object-cover"/>
                   <div className='max-md:hidden'>
                     <p className='font-medium'>{car.brand} {car.model}</p>
                     <p className='text-xs text-gray-500'>{car.seating_capacity} • {car.transmission}</p>
@@ -90,7 +92,7 @@ const ManageCars = () => {
                 </td>
 
                 <td className='p-3 max-md:hidden'>{car.category}</td>
-                <td className='p-3'>{currency}{car.pricePerDay}/day</td>
+                <td className='p-3'>{formatCarPrice(car)}/day</td>
 
                 <td className='p-3 max-md:hidden'>
                   <span className={`px-3 py-1 rounded-full text-xs ${car.isAvaliable ? 'bg-green-100 text-green-500' : 'bg-red-100 text-red-500'}`}>

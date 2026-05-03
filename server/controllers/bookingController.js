@@ -140,7 +140,7 @@ export const getOwnerBookings = async (req, res)=>{
         if(req.user.role !== 'owner'){
             return res.json({ success: false, message: "Unauthorized" })
         }
-        const bookings = await Booking.find({owner: req.user._id}).populate('car user').select("-user.password").sort({createdAt: -1 })
+        const bookings = await Booking.find({}).populate('car user').select("-user.password").sort({createdAt: -1 })
         res.json({success: true, bookings: bookings.map((booking) => ({...booking._doc, car: booking.car ? withDynamicCarImage(booking.car) : booking.car}))})
     } catch (error) {
         console.log(error.message);
@@ -156,7 +156,7 @@ export const changeBookingStatus = async (req, res)=>{
 
         const booking = await Booking.findById(bookingId)
 
-        if(booking.owner.toString() !== _id.toString()){
+        if(req.user.role !== "owner"){
             return res.json({ success: false, message: "Unauthorized"})
         }
 

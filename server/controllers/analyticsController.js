@@ -27,7 +27,7 @@ export const getOwnerAnalytics = async (req, res) => {
             })
         }
 
-        const cars = await Car.find({owner: req.user._id});
+        const cars = await Car.find({});
         const carIds = cars.map((car) => car._id);
         const bookings = await Booking.find({car: {$in: carIds}}).populate("car");
         const confirmed = bookings.filter((booking) => booking.status === "confirmed");
@@ -50,7 +50,8 @@ export const getOwnerAnalytics = async (req, res) => {
                 utilizationRate: cars.length ? Math.round((confirmed.length / cars.length) * 100) : 0,
                 topLocations: Object.entries(locationMap).map(([location, count]) => ({location, bookings: count})).sort((a,b) => b.bookings - a.bookings).slice(0, 5),
                 cancellationRate: bookings.length ? Math.round((cancelled.length / bookings.length) * 100) : 0,
-                refundTotal: refunds.reduce((sum, refund) => sum + refund.amount, 0)
+                refundTotal: refunds.reduce((sum, refund) => sum + refund.amount, 0),
+                primaryRevenueLocation: bookings.find((booking) => booking.car?.location)?.car.location || "Mumbai"
             }
         })
     } catch (error) {

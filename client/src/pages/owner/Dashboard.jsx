@@ -4,10 +4,11 @@ import Title from '../../components/owner/Title'
 import { useAppContext } from '../../context/AppContext'
 import toast from 'react-hot-toast'
 import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { formatBookingPrice, formatLocationPrice } from '../../utils/currency'
 
 const Dashboard = () => {
 
-  const {axios, isOwner, currency} = useAppContext()
+  const {axios, isOwner} = useAppContext()
 
   const [data, setData] = useState({
     totalCars: 0,
@@ -99,7 +100,7 @@ const Dashboard = () => {
               </div>
 
               <div className='flex items-center gap-2 font-medium'>
-                <p className='text-sm text-gray-500'>{currency}{booking.price}</p>
+                <p className='text-sm text-gray-500'>{formatBookingPrice(booking)}</p>
                 <p className='px-3 py-0.5 border border-borderColor rounded-full text-sm'>{booking.status}</p>
               </div>
             </div>
@@ -110,7 +111,7 @@ const Dashboard = () => {
         <div className='p-4 md:p-6 mb-6 border border-borderColor rounded-md w-full md:max-w-xs'>
           <h1 className='text-lg font-medium'>Monthly Revenue</h1>
           <p className='text-gray-500'>Revenue for current month</p>
-          <p className='text-3xl mt-6 font-semibold text-primary'>{currency}{data.monthlyRevenue}</p>
+          <p className='text-3xl mt-6 font-semibold text-primary'>{formatLocationPrice(data.monthlyRevenue, data.primaryRevenueLocation || 'Mumbai')}</p>
         </div>
         
       </div>
@@ -142,7 +143,7 @@ const Dashboard = () => {
           </div>
           <div className='rounded-xl border border-borderColor bg-white/60 p-5'>
             <p className='text-gray-500'>Refund total</p>
-            <p className='text-3xl font-bold text-primary'>{currency}{analytics.refundTotal}</p>
+            <p className='text-3xl font-bold text-primary'>{formatLocationPrice(analytics.refundTotal, analytics.primaryRevenueLocation || 'Mumbai')}</p>
           </div>
           <div className='rounded-xl border border-borderColor bg-white/60 p-5'>
             <p className='mb-3 font-semibold'>Top locations</p>

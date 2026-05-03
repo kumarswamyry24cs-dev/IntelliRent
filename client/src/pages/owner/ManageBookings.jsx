@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react'
 import Title from '../../components/owner/Title'
 import { useAppContext } from '../../context/AppContext'
 import toast from 'react-hot-toast'
+import { formatBookingPrice } from '../../utils/currency'
+import { getDisplayCarImage, getFallbackCarImage } from '../../utils/carImages'
 
 const ManageBookings = () => {
 
-  const { currency, axios } = useAppContext()
+  const { axios } = useAppContext()
 
   const [bookings, setBookings] = useState([])
 
@@ -59,7 +61,7 @@ const ManageBookings = () => {
               <tr key={index} className='border-t border-borderColor text-gray-500'>
 
                 <td className='p-3 flex items-center gap-3'>
-                  <img src={booking.car.image} alt="" className='h-12 w-12 aspect-square rounded-md object-cover'/>
+                  <img src={getDisplayCarImage(booking.car)} onError={(event) => { event.currentTarget.src = getFallbackCarImage(booking.car) }} alt={`${booking.car.brand} ${booking.car.model}`} className='h-12 w-12 aspect-square rounded-md object-cover'/>
                   <p className='font-medium max-md:hidden'>{booking.car.brand} {booking.car.model}</p>
                 </td>
 
@@ -67,7 +69,7 @@ const ManageBookings = () => {
                   {booking.pickupDate.split('T')[0]} to {booking.returnDate.split('T')[0]}
                 </td>
 
-                <td className='p-3'>{currency}{booking.price}</td>
+                <td className='p-3'>{formatBookingPrice(booking)}</td>
 
                 <td className='p-3 max-md:hidden'>
                   <span className='bg-gray-100 px-3 py-1 rounded-full text-xs'>{booking.paymentStatus || 'unpaid'}</span>

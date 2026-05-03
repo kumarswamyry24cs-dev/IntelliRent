@@ -48,11 +48,14 @@ export const addCar = async (req, res)=>{
 // API to List Owner Cars
 export const getOwnerCars = async (req, res)=>{
     try {
-        const {_id} = req.user;
+        const {role} = req.user;
+        if(role !== 'owner'){
+            return res.json({ success: false, message: "Unauthorized" });
+        }
         if(!isDbConnected()){
             return res.status(503).json({success: false, message: "Database is offline. Owner cars require MongoDB."})
         }
-        const cars = await Car.find({owner: _id })
+        const cars = await Car.find({}).sort({createdAt: -1})
         res.json({success: true, cars: cars.map(withDynamicCarImage)})
     } catch (error) {
         console.log(error.message);
@@ -71,7 +74,7 @@ export const toggleCarAvailability = async (req, res) =>{
         const car = await Car.findById(carId)
 
         // Checking is car belongs to the user
-        if(car.owner.toString() !== _id.toString()){
+        if(req.user.role !== "owner"){
             return res.json({ success: false, message: "Unauthorized" });
         }
 
@@ -97,7 +100,7 @@ export const deleteCar = async (req, res) =>{
         const car = await Car.findById(carId)
 
         // Checking is car belongs to the user
-        if(car.owner.toString() !== _id.toString()){
+        if(req.user.role !== "owner"){
             return res.json({ success: false, message: "Unauthorized" });
         }
 
@@ -126,14 +129,15 @@ export const getDashboardData = async (req, res) =>{
             return res.status(503).json({success: false, message: "Database is offline. Dashboard metrics require MongoDB."});
         }
 
-        const cars = await Car.find({owner: _id})
-        const bookings = await Booking.find({ owner: _id }).populate('car').sort({ createdAt: -1 });
+        const cars = await Car.find({})
+        const bookings = await Booking.find({}).populate('car').sort({ createdAt: -1 });
 
-        const pendingBookings = await Booking.find({owner: _id, status: "pending" })
-        const completedBookings = await Booking.find({owner: _id, status: "confirmed" })
+        const pendingBookings = await Booking.find({status: "pending" })
+        const completedBookings = await Booking.find({status: "confirmed" })
 
         // Calculate monthlyRevenue from bookings where status is confirmed
         const monthlyRevenue = bookings.slice().filter(booking => booking.status === 'confirmed').reduce((acc, booking)=> acc + booking.price, 0)
+        const primaryRevenueLocation = bookings.find((booking) => booking.car?.location)?.car.location || "Mumbai";
 
         const dashboardData = {
             totalCars: cars.length,
@@ -141,7 +145,8 @@ export const getDashboardData = async (req, res) =>{
             pendingBookings: pendingBookings.length,
             completedBookings: completedBookings.length,
             recentBookings: bookings.slice(0,3).map((booking) => ({...booking._doc, car: booking.car ? withDynamicCarImage(booking.car) : booking.car})),
-            monthlyRevenue
+            monthlyRevenue,
+            primaryRevenueLocation
         }
 
         res.json({ success: true, dashboardData });
